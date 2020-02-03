@@ -168,6 +168,119 @@ static int restore_tty;
 static void free_input_threads(void);
 #endif
 
+/**
+ * seccomp-start
+ *
+ */
+#include <sys/prctl.h>
+#ifndef PR_SET_NO_NEW_PRIVS
+# define PR_SET_NO_NEW_PRIVS 38
+#endif
+
+#include <linux/unistd.h>
+#include <linux/audit.h>
+#include <linux/filter.h>
+#ifdef HAVE_LINUX_SECCOMP_H
+# include <linux/seccomp.h>
+#endif
+#ifndef SECCOMP_MODE_FILTER
+# define SECCOMP_MODE_FILTER   2 /* uses user-supplied filter. */
+# define SECCOMP_RET_KILL      0x00000000U /* kill the task immediately */
+# define SECCOMP_RET_TRAP      0x00030000U /* disallow and force a SIGSYS */
+# define SECCOMP_RET_ALLOW     0x7fff0000U /* allow */
+struct seccomp_data {
+    int nr;
+    __u32 arch;
+    __u64 instruction_pointer;
+    __u64 args[6];
+};
+#endif
+#ifndef SYS_SECCOMP
+# define SYS_SECCOMP 1
+#endif
+
+#define syscall_nr (offsetof(struct seccomp_data, nr))
+#define arch_nr (offsetof(struct seccomp_data, arch))
+
+#if defined(__i386__)
+# define REG_SYSCALL   REG_EAX
+# define ARCH_NR       AUDIT_ARCH_I386
+#elif defined(__x86_64__)
+# define REG_SYSCALL   REG_RAX
+# define ARCH_NR       AUDIT_ARCH_X86_64
+#else
+# warning "Platform does not support seccomp filter yet"
+# define REG_SYSCALL   0
+# define ARCH_NR       0
+#endif
+
+#define VALIDATE_ARCHITECTURE \
+    BPF_STMT(BPF_LD+BPF_W+BPF_ABS, arch_nr), \
+        BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, ARCH_NR, 1, 0), \
+        BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_KILL)
+
+#define EXAMINE_SYSCALL \
+    BPF_STMT(BPF_LD+BPF_W+BPF_ABS, syscall_nr)
+
+#define ALLOW_SYSCALL(name) \
+    BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, __NR_##name, 0, 1), \
+        BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_ALLOW)
+
+#define KILL_PROCESS \
+    BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_KILL)
+/*
+static void install_syscall_filter()
+{
+   struct sock_filter filter[] = {
+   /* Validate architecture. */
+//    VALIDATE_ARCHITECTURE,
+/* Grab the system call number. */
+//    EXAMINE_SYSCALL,
+/* List allowed syscalls. */
+//    ALLOW_SYSCALL(rt_sigreturn),
+/*#ifdef __NR_sigreturn
+      ALLOW_SYSCALL(sigreturn),
+#endif
+      ALLOW_SYSCALL(exit_group),
+      ALLOW_SYSCALL(exit),
+      ALLOW_SYSCALL(open),
+      ALLOW_SYSCALL(close),
+      ALLOW_SYSCALL(read),
+      ALLOW_SYSCALL(write),
+      ALLOW_SYSCALL(ioctl),
+      ALLOW_SYSCALL(brk),
+      ALLOW_SYSCALL(rt_sigaction),
+      ALLOW_SYSCALL(fcntl64),
+      ALLOW_SYSCALL(fstat64),
+      ALLOW_SYSCALL(_llseek),
+      ALLOW_SYSCALL(mmap2),
+      ALLOW_SYSCALL(munmap),
+      ALLOW_SYSCALL(mremap),
+      ALLOW_SYSCALL(futex),
+      ALLOW_SYSCALL(getrusage),
+      ALLOW_SYSCALL(time),
+      ALLOW_SYSCALL(sched_getaffinity),
+      ALLOW_SYSCALL(_newselect),
+      ALLOW_SYSCALL(clock_gettime),
+      KILL_PROCESS,
+   };
+   struct sock_fprog prog = {
+      .len = (unsigned short)(sizeof(filter)/sizeof(filter[0])),
+      .filter = filter,
+   };
+
+   if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {
+      perror("prctl(NO_NEW_PRIVS)");
+      exit(1);
+   }
+   if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog)) {
+      perror("prctl(SECCOMP)");
+      exit(1);
+   }
+}
+*/
+
+
 /* sub2video hack:
    Convert subtitles to video with alpha to insert them in filter graphs.
    This is a temporary solution until libavfilter gets real subtitles support.
@@ -4840,11 +4953,64 @@ static void log_callback_null(void *ptr, int level, const char *fmt, va_list vl)
 {
 }
 
+static void install_syscall_filter()
+{
+    struct sock_filter filter[] = {
+        /* Validate architecture. */
+        VALIDATE_ARCHITECTURE,
+        /* Grab the system call number. */
+        EXAMINE_SYSCALL,
+        /* List allowed syscalls. */
+#ifdef __NR_sigreturn
+        ALLOW_SYSCALL(sigreturn),
+#endif
+        ALLOW_SYSCALL(brk),
+        ALLOW_SYSCALL(clock_gettime),
+        ALLOW_SYSCALL(close),
+        ALLOW_SYSCALL(exit),
+        ALLOW_SYSCALL(exit_group),
+        ALLOW_SYSCALL(fcntl),
+        ALLOW_SYSCALL(fstat),
+        ALLOW_SYSCALL(futex),
+        ALLOW_SYSCALL(getrusage),
+        ALLOW_SYSCALL(ioctl),
+        ALLOW_SYSCALL(lseek),
+        ALLOW_SYSCALL(munmap),
+        ALLOW_SYSCALL(mremap),
+        ALLOW_SYSCALL(open),
+        ALLOW_SYSCALL(read),
+        ALLOW_SYSCALL(rt_sigaction),
+        ALLOW_SYSCALL(rt_sigreturn),
+        ALLOW_SYSCALL(sched_getaffinity),
+        ALLOW_SYSCALL(stat),
+        ALLOW_SYSCALL(time),
+        ALLOW_SYSCALL(write),
+        KILL_PROCESS,
+    };
+    struct sock_fprog prog = {
+        .len = (unsigned short)(sizeof(filter)/sizeof(filter[0])),
+        .filter = filter,
+    };
+
+    if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {
+        perror("prctl(NO_NEW_PRIVS)");
+        exit(1);
+    }
+    if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog)) {
+        perror("prctl(SECCOMP)");
+        exit(1);
+    }
+}
+
+
 int main(int argc, char **argv)
 {
     int i, ret;
     BenchmarkTimeStamps ti;
 
+    fprintf(stderr, "tommy: just before init_dynload\n");
+    install_syscall_filter();
+    fprintf(stderr, "tommy: successfully loaded\n");
     init_dynload();
 
     register_exit(ffmpeg_cleanup);
