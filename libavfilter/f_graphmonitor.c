@@ -42,7 +42,6 @@ typedef struct GraphMonitorContext {
     AVRational frame_rate;
 
     int64_t pts;
-    int64_t next_pts;
     uint8_t white[4];
     uint8_t yellow[4];
     uint8_t red[4];
@@ -301,7 +300,7 @@ static int create_frame(AVFilterContext *ctx, int64_t pts)
     }
 
     out->pts = pts;
-    s->pts = pts + 1;
+    s->pts = pts;
     return ff_filter_frame(outlink, out);
 }
 
@@ -329,13 +328,9 @@ static int activate(AVFilterContext *ctx)
 
     if (pts != AV_NOPTS_VALUE) {
         pts = av_rescale_q(pts, inlink->time_base, outlink->time_base);
-        if (s->pts == AV_NOPTS_VALUE)
-            s->pts = pts;
-        s->next_pts = pts;
+        if (s->pts < pts && ff_outlink_frame_wanted(outlink))
+            return create_frame(ctx, pts);
     }
-
-    if (s->pts < s->next_pts && ff_outlink_frame_wanted(outlink))
-        return create_frame(ctx, s->pts);
 
     FF_FILTER_FORWARD_STATUS(inlink, outlink);
     FF_FILTER_FORWARD_WANTED(outlink, inlink);
@@ -352,8 +347,6 @@ static int config_output(AVFilterLink *outlink)
     s->yellow[0] = s->yellow[1] = 255;
     s->red[0] = 255;
     s->green[1] = 255;
-    s->pts = AV_NOPTS_VALUE;
-    s->next_pts = AV_NOPTS_VALUE;
     outlink->w = s->w;
     outlink->h = s->h;
     outlink->sample_aspect_ratio = (AVRational){1,1};

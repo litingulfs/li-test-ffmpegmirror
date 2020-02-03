@@ -127,14 +127,13 @@ static int append_extradata(AVCodecParameters *par, AVIOContext *pb, int len)
     int new_size, ret;
     uint8_t *new_extradata;
 
-    if (previous_size > INT_MAX - AV_INPUT_BUFFER_PADDING_SIZE - len)
+    if (previous_size > INT_MAX - len)
         return AVERROR_INVALIDDATA;
 
     new_size = previous_size + len;
     new_extradata = av_realloc(par->extradata, new_size + AV_INPUT_BUFFER_PADDING_SIZE);
     if (!new_extradata)
         return AVERROR(ENOMEM);
-    memset(new_extradata + new_size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
     par->extradata = new_extradata;
     par->extradata_size = new_size;
 
@@ -178,9 +177,10 @@ static int apng_read_header(AVFormatContext *s)
         return ret;
 
     /* extradata will contain every chunk up to the first fcTL (excluded) */
-    ret = ff_alloc_extradata(st->codecpar, len + 12);
-    if (ret < 0)
-        return ret;
+    st->codecpar->extradata = av_malloc(len + 12 + AV_INPUT_BUFFER_PADDING_SIZE);
+    if (!st->codecpar->extradata)
+        return AVERROR(ENOMEM);
+    st->codecpar->extradata_size = len + 12;
     AV_WB32(st->codecpar->extradata,    len);
     AV_WL32(st->codecpar->extradata+4,  tag);
     AV_WB32(st->codecpar->extradata+8,  st->codecpar->width);
@@ -241,6 +241,10 @@ static int apng_read_header(AVFormatContext *s)
     }
 
 fail:
+    if (st->codecpar->extradata_size) {
+        av_freep(&st->codecpar->extradata);
+        st->codecpar->extradata_size = 0;
+    }
     return ret;
 }
 

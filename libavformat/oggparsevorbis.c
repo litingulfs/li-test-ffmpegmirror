@@ -177,8 +177,9 @@ int ff_vorbis_comment(AVFormatContext *as, AVDictionary **m,
                     av_dict_set(m, tt, ";", AV_DICT_APPEND);
                 }
                 av_dict_set(m, tt, ct,
-                            AV_DICT_DONT_STRDUP_KEY | AV_DICT_DONT_STRDUP_VAL |
+                            AV_DICT_DONT_STRDUP_KEY |
                             AV_DICT_APPEND);
+                av_freep(&ct);
             }
         }
     }

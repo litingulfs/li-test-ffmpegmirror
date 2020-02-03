@@ -87,7 +87,9 @@ static int rm_read_extradata(AVFormatContext *s, AVIOContext *pb, AVCodecParamet
         av_log(s, AV_LOG_ERROR, "extradata size %u too large\n", size);
         return -1;
     }
-    return ff_get_extradata(s, par, pb, size);
+    if (ff_get_extradata(s, par, pb, size) < 0)
+        return AVERROR(ENOMEM);
+    return 0;
 }
 
 static void rm_read_metadata(AVFormatContext *s, AVIOContext *pb, int wide)
@@ -722,8 +724,8 @@ static int rm_sync(AVFormatContext *s, int64_t *timestamp, int *flags, int *stre
 
             num = avio_rb16(pb);
             *timestamp = avio_rb32(pb);
-            mlti_id = (avio_r8(pb) >> 1) - 1;
-            mlti_id = FFMAX(mlti_id, 0) << 16;
+            mlti_id = (avio_r8(pb)>>1)-1<<16;
+            mlti_id = FFMAX(mlti_id, 0);
             *flags = avio_r8(pb); /* flags */
         }
         for(i=0;i<s->nb_streams;i++) {
@@ -781,8 +783,8 @@ static int rm_assemble_video_frame(AVFormatContext *s, AVIOContext *pb,
             return -1;
         }
         rm->remaining_len -= len;
-        if ((ret = av_new_packet(pkt, len + 9)) < 0)
-            return ret;
+        if(av_new_packet(pkt, len + 9) < 0)
+            return AVERROR(EIO);
         pkt->data[0] = 0;
         AV_WL32(pkt->data + 1, 1);
         AV_WL32(pkt->data + 5, 0);
@@ -804,8 +806,8 @@ static int rm_assemble_video_frame(AVFormatContext *s, AVIOContext *pb,
         vst->slices = ((hdr & 0x3F) << 1) + 1;
         vst->videobufsize = len2 + 8*vst->slices + 1;
         av_packet_unref(&vst->pkt); //FIXME this should be output.
-        if ((ret = av_new_packet(&vst->pkt, vst->videobufsize)) < 0)
-            return ret;
+        if(av_new_packet(&vst->pkt, vst->videobufsize) < 0)
+            return AVERROR(ENOMEM);
         memset(vst->pkt.data, 0, vst->pkt.size);
         vst->videobufpos = 8*vst->slices + 1;
         vst->cur_slice = 0;
@@ -834,7 +836,10 @@ static int rm_assemble_video_frame(AVFormatContext *s, AVIOContext *pb,
 
     if (type == 2 || vst->videobufpos == vst->videobufsize) {
         vst->pkt.data[0] = vst->cur_slice-1;
-        av_packet_move_ref(pkt, &vst->pkt);
+        *pkt= vst->pkt;
+        vst->pkt.data= NULL;
+        vst->pkt.size= 0;
+        vst->pkt.buf = NULL;
         if(vst->slices != vst->cur_slice) //FIXME find out how to set slices correct from the begin
             memmove(pkt->data + 1 + 8*vst->cur_slice, pkt->data + 1 + 8*vst->slices,
                 vst->videobufpos - 1 - 8*vst->slices);
@@ -1169,7 +1174,7 @@ static int ivr_read_header(AVFormatContext *s)
     uint8_t key[256], val[256];
     AVIOContext *pb = s->pb;
     AVStream *st;
-    int64_t pos, offset=0, temp;
+    int64_t pos, offset, temp;
 
     pos = avio_tell(pb);
     tag = avio_rl32(pb);
@@ -1186,8 +1191,6 @@ static int ivr_read_header(AVFormatContext *s)
             offset = temp;
             temp = avio_rb64(pb);
         }
-        if (offset <= 0)
-            return AVERROR_INVALIDDATA;
         avio_skip(pb, offset - avio_tell(pb));
         if (avio_r8(pb) != 1)
             return AVERROR_INVALIDDATA;

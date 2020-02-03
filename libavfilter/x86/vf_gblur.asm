@@ -100,7 +100,7 @@ cglobal horiz_slice, 4, 9, 9, ptr, width, height, steps, nu, bscale, x, y, step,
 
         add widthq, remainq
         cmp xq, widthq
-        jge .end_scalar
+        je .end_scalar
 
         .loop_scalar:
             ; ptr[x] += nu * ptr[x-1]
@@ -148,7 +148,7 @@ cglobal horiz_slice, 4, 9, 9, ptr, width, height, steps, nu, bscale, x, y, step,
             jg .loop_x_back
 
         cmp xq, 0
-        jle .end_scalar_back
+        je .end_scalar_back
 
         .loop_scalar_back:
             ; ptr[x-1] += nu * ptr[x]

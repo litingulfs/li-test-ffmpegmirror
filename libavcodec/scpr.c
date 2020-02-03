@@ -504,7 +504,7 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
             return ret;
     }
 
-    if ((ret = ff_reget_buffer(avctx, s->current_frame, 0)) < 0)
+    if ((ret = ff_reget_buffer(avctx, s->current_frame)) < 0)
         return ret;
 
     bytestream2_init(gb, avpkt->data, avpkt->size);
@@ -532,10 +532,7 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
                             s->current_frame->linesize[0] / 4);
     } else if (type == 17 || type == 33) {
         uint32_t clr, *dst = (uint32_t *)s->current_frame->data[0];
-        int y;
-
-        if (bytestream2_get_bytes_left(gb) < 3)
-            return AVERROR_INVALIDDATA;
+        int x, y;
 
         frame->key_frame = 1;
         bytestream2_skip(gb, 1);
@@ -551,8 +548,9 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
             clr = bytestream2_get_le24(gb);
         }
         for (y = 0; y < avctx->height; y++) {
-            dst[0] = clr;
-            av_memcpy_backptr((uint8_t*)(dst+1), 4, 4*avctx->width - 4);
+            for (x = 0; x < avctx->width; x++) {
+                dst[x] = clr;
+            }
             dst += s->current_frame->linesize[0] / 4;
         }
     } else if (type == 0 || type == 1) {

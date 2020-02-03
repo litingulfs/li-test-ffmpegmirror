@@ -326,7 +326,7 @@ static const AVOption options[] = {
 };
 
 static const AVClass cache_context_class = {
-    .class_name = "cache",
+    .class_name = "Cache",
     .item_name  = av_default_item_name,
     .option     = options,
     .version    = LIBAVUTIL_VERSION_INT,

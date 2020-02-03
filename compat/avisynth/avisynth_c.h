@@ -1096,7 +1096,7 @@ AVSC_INLINE AVS_Library * avs_load_library() {
   AVS_Library *library = (AVS_Library *)malloc(sizeof(AVS_Library));
   if (library == NULL)
     return NULL;
-  library->handle = LoadLibraryA("avisynth");
+  library->handle = LoadLibrary("avisynth");
   if (library->handle == NULL)
     goto fail;
 

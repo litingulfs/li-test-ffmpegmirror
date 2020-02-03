@@ -774,7 +774,6 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
 
             /* push one video frame */
             if (ebur128->do_video) {
-                AVFrame *clone;
                 int x, y, ret;
                 uint8_t *p;
                 double gauge_value;
@@ -824,10 +823,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
 
                 /* set pts and push frame */
                 pic->pts = pts;
-                clone = av_frame_clone(pic);
-                if (!clone)
-                    return AVERROR(ENOMEM);
-                ret = ff_filter_frame(outlink, clone);
+                ret = ff_filter_frame(outlink, av_frame_clone(pic));
                 if (ret < 0)
                     return ret;
             }

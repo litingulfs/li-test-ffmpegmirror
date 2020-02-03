@@ -1065,7 +1065,7 @@ static int bit_alloc(AC3EncodeContext *s, int snr_offset)
 {
     int blk, ch;
 
-    snr_offset = (snr_offset - 240) * 4;
+    snr_offset = (snr_offset - 240) << 2;
 
     reset_block_bap(s);
     for (blk = 0; blk < s->num_blocks; blk++) {
@@ -2051,8 +2051,7 @@ av_cold int ff_ac3_encode_close(AVCodecContext *avctx)
         av_freep(&block->cpl_coord_mant);
     }
 
-    if (s->mdct_end)
-        s->mdct_end(s);
+    s->mdct_end(s);
 
     return 0;
 }
@@ -2434,7 +2433,7 @@ av_cold int ff_ac3_encode_init(AVCodecContext *avctx)
 
     ret = validate_options(s);
     if (ret)
-        goto init_fail;
+        return ret;
 
     avctx->frame_size = AC3_BLOCK_SIZE * s->num_blocks;
     avctx->initial_padding = AC3_BLOCK_SIZE;

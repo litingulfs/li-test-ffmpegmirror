@@ -25,7 +25,6 @@
  */
 
 #include "libavutil/avassert.h"
-#include "libavutil/avstring.h"
 #include "libavutil/channel_layout.h"
 #include "libavutil/common.h"
 #include "libavutil/opt.h"
@@ -186,10 +185,12 @@ static av_cold int join_init(AVFilterContext *ctx)
         return ret;
 
     for (i = 0; i < s->inputs; i++) {
+        char name[32];
         AVFilterPad pad = { 0 };
 
-        pad.type = AVMEDIA_TYPE_AUDIO;
-        pad.name = av_asprintf("input%d", i);
+        snprintf(name, sizeof(name), "input%d", i);
+        pad.type           = AVMEDIA_TYPE_AUDIO;
+        pad.name           = av_strdup(name);
         if (!pad.name)
             return AVERROR(ENOMEM);
 
@@ -207,12 +208,9 @@ static av_cold void join_uninit(AVFilterContext *ctx)
     JoinContext *s = ctx->priv;
     int i;
 
-    for (i = 0; i < s->inputs && s->input_frames; i++) {
-        av_frame_free(&s->input_frames[i]);
-    }
-
     for (i = 0; i < ctx->nb_inputs; i++) {
         av_freep(&ctx->input_pads[i].name);
+        av_frame_free(&s->input_frames[i]);
     }
 
     av_freep(&s->channels);

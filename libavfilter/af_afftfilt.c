@@ -188,8 +188,6 @@ static int config_input(AVFilterLink *inlink)
     if (!args)
         return AVERROR(ENOMEM);
 
-    saveptr = NULL;
-    last_expr = "1";
     for (ch = 0; ch < inlink->channels; ch++) {
         char *arg = av_strtok(ch == 0 ? args : NULL, "|", &saveptr);
 
@@ -315,7 +313,7 @@ static int filter_frame(AVFilterLink *inlink)
     }
 
     out->pts = s->pts;
-    s->pts += av_rescale_q(s->hop_size, (AVRational){1, outlink->sample_rate}, outlink->time_base);
+    s->pts += s->hop_size;
 
     for (ch = 0; ch < inlink->channels; ch++) {
         float *dst = (float *)out->extended_data[ch];

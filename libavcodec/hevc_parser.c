@@ -202,9 +202,6 @@ static int parse_nal_units(AVCodecParserContext *s, const uint8_t *buf,
         H2645NAL *nal = &ctx->pkt.nals[i];
         GetBitContext *gb = &nal->gb;
 
-        if (nal->nuh_layer_id > 0)
-            continue;
-
         switch (nal->type) {
         case HEVC_NAL_VPS:
             ff_hevc_decode_nal_vps(gb, avctx, ps);

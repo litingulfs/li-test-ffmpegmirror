@@ -168,10 +168,6 @@ static int cine_read_header(AVFormatContext *avctx)
     avio_skip(pb, 616); // Binning .. bFlipH
     if (!avio_rl32(pb) ^ vflip) {
         st->codecpar->extradata  = av_strdup("BottomUp");
-        if (!st->codecpar->extradata) {
-            st->codecpar->extradata_size = 0;
-            return AVERROR(ENOMEM);
-        }
         st->codecpar->extradata_size  = 9;
     }
 

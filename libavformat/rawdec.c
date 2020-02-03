@@ -39,8 +39,8 @@ int ff_raw_read_partial_packet(AVFormatContext *s, AVPacket *pkt)
 
     size = raw->raw_packet_size;
 
-    if ((ret = av_new_packet(pkt, size)) < 0)
-        return ret;
+    if (av_new_packet(pkt, size) < 0)
+        return AVERROR(ENOMEM);
 
     pkt->pos= avio_tell(s->pb);
     pkt->stream_index = 0;

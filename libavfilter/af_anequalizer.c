@@ -205,10 +205,8 @@ static av_cold int init(AVFilterContext *ctx)
             .type         = AVMEDIA_TYPE_VIDEO,
             .config_props = config_video,
         };
-        if (!vpad.name) {
-            av_freep(&pad.name);
+        if (!vpad.name)
             return AVERROR(ENOMEM);
-        }
     }
 
     ret = ff_insert_outpad(ctx, 0, &pad);
@@ -733,18 +731,13 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *buf)
     }
 
     if (s->draw_curves) {
-        AVFrame *clone;
-
         const int64_t pts = buf->pts +
             av_rescale_q(buf->nb_samples, (AVRational){ 1, inlink->sample_rate },
                          outlink->time_base);
         int ret;
 
         s->video->pts = pts;
-        clone = av_frame_clone(s->video);
-        if (!clone)
-            return AVERROR(ENOMEM);
-        ret = ff_filter_frame(ctx->outputs[1], clone);
+        ret = ff_filter_frame(ctx->outputs[1], av_frame_clone(s->video));
         if (ret < 0)
             return ret;
     }

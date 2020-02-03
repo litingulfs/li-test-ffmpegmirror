@@ -40,7 +40,7 @@ static int dfa_read_header(AVFormatContext *s)
 {
     AVIOContext *pb = s->pb;
     AVStream *st;
-    int frames, ret;
+    int frames;
     int version;
     uint32_t mspf;
 
@@ -69,8 +69,8 @@ static int dfa_read_header(AVFormatContext *s)
     avio_skip(pb, 128 - 16); // padding
     st->duration = frames;
 
-    if ((ret = ff_alloc_extradata(st->codecpar, 2)) < 0)
-        return ret;
+    if (ff_alloc_extradata(st->codecpar, 2))
+        return AVERROR(ENOMEM);
     AV_WL16(st->codecpar->extradata, version);
     if (version == 0x100)
         st->sample_aspect_ratio = (AVRational){2, 1};

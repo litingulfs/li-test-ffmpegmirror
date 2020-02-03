@@ -110,7 +110,6 @@ FRAMESYNC_DEFINE_CLASS(libvmaf, LIBVMAFContext, fs);
         const type *main_ptr = (const type *) s->gmain->data[0];                \
         \
         float *ptr = ref_data;                                                  \
-        float factor = 1.f / (1 << (bits - 8));                                 \
         \
         int h = s->height;                                                      \
         int w = s->width;                                                       \
@@ -119,7 +118,7 @@ FRAMESYNC_DEFINE_CLASS(libvmaf, LIBVMAFContext, fs);
         \
         for (i = 0; i < h; i++) {                                               \
             for ( j = 0; j < w; j++) {                                          \
-                ptr[j] = ref_ptr[j] * factor;                                   \
+                ptr[j] = (float)ref_ptr[j];                                     \
             }                                                                   \
             ref_ptr += ref_stride / sizeof(*ref_ptr);                           \
             ptr += stride / sizeof(*ptr);                                       \
@@ -129,7 +128,7 @@ FRAMESYNC_DEFINE_CLASS(libvmaf, LIBVMAFContext, fs);
         \
         for (i = 0; i < h; i++) {                                               \
             for (j = 0; j < w; j++) {                                           \
-                ptr[j] = main_ptr[j] * factor;                                  \
+                ptr[j] = (float)main_ptr[j];                                    \
             }                                                                   \
             main_ptr += main_stride / sizeof(*main_ptr);                        \
             ptr += stride / sizeof(*ptr);                                       \
@@ -235,9 +234,6 @@ static av_cold int init(AVFilterContext *ctx)
 
     s->gref = av_frame_alloc();
     s->gmain = av_frame_alloc();
-    if (!s->gref || !s->gmain)
-        return AVERROR(ENOMEM);
-
     s->error = 0;
 
     s->vmaf_thread_created = 0;

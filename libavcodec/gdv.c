@@ -358,8 +358,7 @@ static int decompress_68(AVCodecContext *avctx, unsigned skip, unsigned use8)
                     if (val != ((1 << lbits) - 1)) {
                         break;
                     }
-                    if (lbits >= 16)
-                        return AVERROR_INVALIDDATA;
+                    assert(lbits < 16);
                 }
                 for (i = 0; i < len; i++) {
                     bytestream2_put_byte(pb, bytestream2_get_byte(gb));

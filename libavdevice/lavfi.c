@@ -302,13 +302,9 @@ av_cold static int lavfi_read_header(AVFormatContext *avctx)
 
     if (lavfi->dump_graph) {
         char *dump = avfilter_graph_dump(lavfi->graph, lavfi->dump_graph);
-        if (dump != NULL) {
-            fputs(dump, stderr);
-            fflush(stderr);
-            av_free(dump);
-        } else {
-            FAIL(AVERROR(ENOMEM));
-        }
+        fputs(dump, stderr);
+        fflush(stderr);
+        av_free(dump);
     }
 
     /* fill each stream with the information in the corresponding sink */

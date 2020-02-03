@@ -217,10 +217,10 @@ static void wavesynth_seek(struct wavesynth_context *ws, int64_t ts)
     *last = -1;
     lcg_seek(&ws->dither_state, (uint32_t)ts - (uint32_t)ws->cur_ts);
     if (ws->pink_need) {
-        uint64_t pink_ts_cur  = (ws->cur_ts + PINK_UNIT - 1) & ~(PINK_UNIT - 1);
-        uint64_t pink_ts_next = ts & ~(PINK_UNIT - 1);
+        int64_t pink_ts_cur  = (ws->cur_ts + PINK_UNIT - 1) & ~(PINK_UNIT - 1);
+        int64_t pink_ts_next = ts & ~(PINK_UNIT - 1);
         int pos = ts & (PINK_UNIT - 1);
-        lcg_seek(&ws->pink_state, (uint32_t)(pink_ts_next - pink_ts_cur) * 2);
+        lcg_seek(&ws->pink_state, (pink_ts_next - pink_ts_cur) << 1);
         if (pos) {
             pink_fill(ws);
             ws->pink_pos = pos;
@@ -301,8 +301,8 @@ static int wavesynth_parse_extradata(AVCodecContext *avc)
             default:
                 return AVERROR(EINVAL);
         }
-        in->amp0 = (uint64_t)a1 << 32;
-        in->damp = (int64_t)(((uint64_t)a2 << 32) - ((uint64_t)a1 << 32)) / dt;
+        in->amp0 = (int64_t)a1 << 32;
+        in->damp = (((int64_t)a2 << 32) - ((int64_t)a1 << 32)) / dt;
     }
     if (edata != edata_end)
         return AVERROR(EINVAL);
@@ -350,8 +350,7 @@ fail:
 static void wavesynth_synth_sample(struct wavesynth_context *ws, int64_t ts,
                                    int32_t *channels)
 {
-    int32_t amp, *cv;
-    unsigned val;
+    int32_t amp, val, *cv;
     struct ws_interval *in;
     int i, *last, pink;
     uint32_t c, all_ch = 0;
@@ -378,7 +377,7 @@ static void wavesynth_synth_sample(struct wavesynth_context *ws, int64_t ts,
                 in->dphi += in->ddphi;
                 break;
             case WS_NOISE:
-                val = amp * (unsigned)pink;
+                val = amp * pink;
                 break;
             default:
                 val = 0;
@@ -386,7 +385,7 @@ static void wavesynth_synth_sample(struct wavesynth_context *ws, int64_t ts,
         all_ch |= in->channels;
         for (c = in->channels, cv = channels; c; c >>= 1, cv++)
             if (c & 1)
-                *cv += (unsigned)val;
+                *cv += val;
     }
     val = (int32_t)lcg_next(&ws->dither_state) >> 16;
     for (c = all_ch, cv = channels; c; c >>= 1, cv++)

@@ -186,7 +186,7 @@ static inline int decode_vui_parameters(GetBitContext *gb, AVCodecContext *avctx
     }
 
     if (show_bits1(gb) && get_bits_left(gb) < 10) {
-        av_log(avctx, AV_LOG_WARNING, "Truncated VUI (%d)\n", get_bits_left(gb));
+        av_log(avctx, AV_LOG_WARNING, "Truncated VUI\n");
         return 0;
     }
 

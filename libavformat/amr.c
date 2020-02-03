@@ -60,6 +60,7 @@ static int amr_write_header(AVFormatContext *s)
     } else {
         return -1;
     }
+    avio_flush(pb);
     return 0;
 }
 

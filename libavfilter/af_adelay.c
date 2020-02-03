@@ -36,7 +36,6 @@ typedef struct ChanDelay {
 
 typedef struct AudioDelayContext {
     const AVClass *class;
-    int all;
     char *delays;
     ChanDelay *chandelay;
     int nb_delays;
@@ -55,7 +54,6 @@ typedef struct AudioDelayContext {
 
 static const AVOption adelay_options[] = {
     { "delays", "set list of delays for each channel", OFFSET(delays), AV_OPT_TYPE_STRING, {.str=NULL}, 0, 0, A },
-    { "all",    "use last available delay for remained channels", OFFSET(all), AV_OPT_TYPE_BOOL, {.i64=0}, 0, 1, A },
     { NULL }
 };
 
@@ -163,11 +161,6 @@ static int config_input(AVFilterLink *inlink)
             av_log(ctx, AV_LOG_ERROR, "Delay must be non negative number.\n");
             return AVERROR(EINVAL);
         }
-    }
-
-    if (s->all && i) {
-        for (int j = i; j < s->nb_delays; j++)
-            s->chandelay[j].delay = s->chandelay[i-1].delay;
     }
 
     s->padding = s->chandelay[0].delay;

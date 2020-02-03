@@ -142,10 +142,6 @@ static int sap_read_header(AVFormatContext *s)
         }
 
         sap->sdp = av_strdup(&recvbuf[pos]);
-        if (!sap->sdp) {
-            ret = AVERROR(ENOMEM);
-            goto fail;
-        }
         break;
     }
 

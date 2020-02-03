@@ -361,8 +361,8 @@ static void read_uslt(AVFormatContext *s, AVIOContext *pb, int taglen,
 {
     uint8_t lang[4];
     uint8_t *descriptor = NULL; // 'Content descriptor'
-    uint8_t *text;
-    char *key;
+    uint8_t *text = NULL;
+    char *key = NULL;
     int encoding;
     int ok = 0;
 
@@ -387,19 +387,18 @@ static void read_uslt(AVFormatContext *s, AVIOContext *pb, int taglen,
     key = av_asprintf("lyrics-%s%s%s", descriptor[0] ? (char *)descriptor : "",
                                        descriptor[0] ? "-" : "",
                                        lang);
-    if (!key) {
-        av_free(text);
+    if (!key)
         goto error;
-    }
 
-    av_dict_set(metadata, key, text,
-                AV_DICT_DONT_STRDUP_KEY | AV_DICT_DONT_STRDUP_VAL);
+    av_dict_set(metadata, key, text, 0);
 
     ok = 1;
 error:
     if (!ok)
         av_log(s, AV_LOG_ERROR, "Error reading lyrics, skipped\n");
     av_free(descriptor);
+    av_free(text);
+    av_free(key);
 }
 
 /**
@@ -1264,6 +1263,8 @@ int ff_id3v2_parse_priv_dict(AVDictionary **metadata, ID3v2ExtraMeta **extra_met
             }
 
             if ((ret = av_dict_set(metadata, key, escaped, dict_flags)) < 0) {
+                av_free(key);
+                av_free(escaped);
                 return ret;
             }
         }

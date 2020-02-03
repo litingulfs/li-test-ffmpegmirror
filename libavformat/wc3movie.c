@@ -130,10 +130,8 @@ static int wc3_read_header(AVFormatContext *s)
             buffer = av_malloc(size+1);
             if (!buffer)
                 return AVERROR(ENOMEM);
-            if ((ret = avio_read(pb, buffer, size)) != size) {
-                av_freep(&buffer);
+            if ((ret = avio_read(pb, buffer, size)) != size)
                 return AVERROR(EIO);
-            }
             buffer[size] = 0;
             av_dict_set(&s->metadata, "title", buffer,
                                    AV_DICT_DONT_STRDUP_VAL);

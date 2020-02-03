@@ -317,6 +317,7 @@ do {                                                        \
     void *oldf = *f;                                        \
                                                             \
     if (!(*f) && !(*f = av_mallocz(sizeof(**f)))) {         \
+        unref_fn(f);                                        \
         return AVERROR(ENOMEM);                             \
     }                                                       \
                                                             \
@@ -455,7 +456,7 @@ do {                                        \
 do {                                                               \
     int idx = -1;                                                  \
                                                                    \
-    if (!ref || !*ref || !(*ref)->refs)                            \
+    if (!*ref || !(*ref)->refs)                                    \
         return;                                                    \
                                                                    \
     FIND_REF_INDEX(ref, idx);                                      \
@@ -517,8 +518,7 @@ void ff_formats_changeref(AVFilterFormats **oldref, AVFilterFormats **newref)
             int ret = ref_fn(fmts, &ctx->inputs[i]->out_fmts);      \
             if (ret < 0) {                                          \
                 unref_fn(&fmts);                                    \
-                if (fmts)                                           \
-                    av_freep(&fmts->list);                          \
+                av_freep(&fmts->list);                              \
                 av_freep(&fmts);                                    \
                 return ret;                                         \
             }                                                       \
@@ -530,8 +530,7 @@ void ff_formats_changeref(AVFilterFormats **oldref, AVFilterFormats **newref)
             int ret = ref_fn(fmts, &ctx->outputs[i]->in_fmts);      \
             if (ret < 0) {                                          \
                 unref_fn(&fmts);                                    \
-                if (fmts)                                           \
-                    av_freep(&fmts->list);                          \
+                av_freep(&fmts->list);                              \
                 av_freep(&fmts);                                    \
                 return ret;                                         \
             }                                                       \

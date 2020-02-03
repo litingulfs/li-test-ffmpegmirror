@@ -29,7 +29,6 @@
 #include "audio_frame_queue.h"
 #include "internal.h"
 
-#if CONFIG_LIBOPENCORE_AMRNB_DECODER || CONFIG_LIBOPENCORE_AMRWB_DECODER
 static int amr_decode_fix_avctx(AVCodecContext *avctx)
 {
     const int is_amr_wb = 1 + (avctx->codec_id == AV_CODEC_ID_AMR_WB);
@@ -47,7 +46,6 @@ static int amr_decode_fix_avctx(AVCodecContext *avctx)
     avctx->sample_fmt     = AV_SAMPLE_FMT_S16;
     return 0;
 }
-#endif
 
 #if CONFIG_LIBOPENCORE_AMRNB
 

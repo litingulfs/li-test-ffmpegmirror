@@ -125,8 +125,8 @@ typedef struct APEPredictor {
     int32_t filterA[2];
     int32_t filterB[2];
 
-    uint32_t coeffsA[2][4];  ///< adaption coefficients
-    uint32_t coeffsB[2][5];  ///< adaption coefficients
+    int32_t coeffsA[2][4];  ///< adaption coefficients
+    int32_t coeffsB[2][5];  ///< adaption coefficients
     int32_t historybuffer[HISTORY_SIZE + PREDICTOR_SIZE];
 
     unsigned int sample_pos;
@@ -496,7 +496,6 @@ static inline int ape_decode_value_3860(APEContext *ctx, GetBitContext *gb,
         x = (overflow << rice->k) + get_bits(gb, rice->k);
     } else {
         av_log(ctx->avctx, AV_LOG_ERROR, "Too many bits: %"PRIu32"\n", rice->k);
-        ctx->error = 1;
         return AVERROR_INVALIDDATA;
     }
     rice->ksum += x - (rice->ksum + 8 >> 4);
@@ -610,12 +609,8 @@ static void decode_array_0000(APEContext *ctx, GetBitContext *gb,
     ksummax = 1 << rice->k + 7;
     ksummin = rice->k ? (1 << rice->k + 6) : 0;
     for (; i < blockstodecode; i++) {
-        if (get_bits_left(&ctx->gb) < 1) {
-            ctx->error = 1;
-            return ;
-        }
         out[i] = get_rice_ook(&ctx->gb, rice->k);
-        rice->ksum += out[i] - (unsigned)out[i - 64];
+        rice->ksum += out[i] - out[i - 64];
         while (rice->ksum < ksummin) {
             rice->k--;
             ksummin = rice->k ? ksummin >> 1 : 0;
@@ -833,8 +828,8 @@ static av_always_inline int filter_fast_3320(APEPredictor *p,
         return decoded;
     }
 
-    predictionA = p->buf[delayA] * 2U - p->buf[delayA - 1];
-    p->lastA[filter] = decoded + ((int32_t)(predictionA  * p->coeffsA[filter][0]) >> 9);
+    predictionA = p->buf[delayA] * 2 - p->buf[delayA - 1];
+    p->lastA[filter] = decoded + (predictionA  * p->coeffsA[filter][0] >> 9);
 
     if ((decoded ^ predictionA) > 0)
         p->coeffsA[filter][0]++;
@@ -847,7 +842,7 @@ static av_always_inline int filter_fast_3320(APEPredictor *p,
 }
 
 static av_always_inline int filter_3800(APEPredictor *p,
-                                        const unsigned decoded, const int filter,
+                                        const int decoded, const int filter,
                                         const int delayA,  const int delayB,
                                         const int start,   const int shift)
 {
@@ -921,8 +916,7 @@ static void long_filter_ehigh_3830(int32_t *buffer, int length)
 {
     int i, j;
     int32_t dotprod, sign;
-    int32_t delay[8] = { 0 };
-    uint32_t coeffs[8] = { 0 };
+    int32_t coeffs[8] = { 0 }, delay[8] = { 0 };
 
     for (i = 0; i < length; i++) {
         dotprod = 0;
@@ -1057,7 +1051,7 @@ static av_always_inline int predictor_update_3930(APEPredictor *p,
                   d3 * p->coeffsA[filter][3];
 
     p->lastA[filter] = decoded + (predictionA >> 9);
-    p->filterA[filter] = p->lastA[filter] + ((int)(p->filterA[filter] * 31U) >> 5);
+    p->filterA[filter] = p->lastA[filter] + ((p->filterA[filter] * 31) >> 5);
 
     sign = APESIGN(decoded);
     p->coeffsA[filter][0] += ((d0 < 0) * 2 - 1) * sign;
@@ -1127,7 +1121,7 @@ static av_always_inline int predictor_update_filter(APEPredictor *p,
 
     p->buf[delayA]     = p->lastA[filter];
     p->buf[adaptA]     = APESIGN(p->buf[delayA]);
-    p->buf[delayA - 1] = p->buf[delayA] - (unsigned)p->buf[delayA - 1];
+    p->buf[delayA - 1] = p->buf[delayA] - p->buf[delayA - 1];
     p->buf[adaptA - 1] = APESIGN(p->buf[delayA - 1]);
 
     predictionA = p->buf[delayA    ] * p->coeffsA[filter][0] +
@@ -1138,7 +1132,7 @@ static av_always_inline int predictor_update_filter(APEPredictor *p,
     /*  Apply a scaled first-order filter compression */
     p->buf[delayB]     = p->filterA[filter ^ 1] - ((int)(p->filterB[filter] * 31U) >> 5);
     p->buf[adaptB]     = APESIGN(p->buf[delayB]);
-    p->buf[delayB - 1] = p->buf[delayB] - (unsigned)p->buf[delayB - 1];
+    p->buf[delayB - 1] = p->buf[delayB] - p->buf[delayB - 1];
     p->buf[adaptB - 1] = APESIGN(p->buf[delayB - 1]);
     p->filterB[filter] = p->filterA[filter ^ 1];
 
@@ -1235,7 +1229,7 @@ static void predictor_decode_mono_3950(APEContext *ctx, int count)
             p->buf = p->historybuffer;
         }
 
-        p->filterA[0] = currentA + (unsigned)((int)(p->filterA[0] * 31U) >> 5);
+        p->filterA[0] = currentA + ((int)(p->filterA[0] * 31U) >> 5);
         *(decoded0++) = p->filterA[0];
     }
 
@@ -1272,8 +1266,8 @@ static void do_apply_filter(APEContext *ctx, int version, APEFilter *f,
                                                      f->delay - order,
                                                      f->adaptcoeffs - order,
                                                      order, APESIGN(*data));
-        res = (int)(res + (1U << (fracbits - 1))) >> fracbits;
-        res += (unsigned)*data;
+        res = (res + (1 << (fracbits - 1))) >> fracbits;
+        res += *data;
         *data++ = res;
 
         /* Update the output history */
@@ -1288,7 +1282,7 @@ static void do_apply_filter(APEContext *ctx, int version, APEFilter *f,
             /* Version 3.98 and later files */
 
             /* Update the adaption coefficients */
-            absres = res < 0 ? -(unsigned)res : res;
+            absres = FFABS(res);
             if (absres)
                 *f->adaptcoeffs = APESIGN(res) *
                                   (8 << ((absres > f->avg * 3) + (absres > f->avg * 4 / 3)));
@@ -1303,7 +1297,7 @@ static void do_apply_filter(APEContext *ctx, int version, APEFilter *f,
             else
                 *f->adaptcoeffs = 0;
 
-            f->avg += (int)(absres - (unsigned)f->avg) / 16;
+            f->avg += (absres - f->avg) / 16;
 
             f->adaptcoeffs[-1] >>= 1;
             f->adaptcoeffs[-2] >>= 1;
@@ -1370,8 +1364,6 @@ static void ape_unpack_mono(APEContext *ctx, int count)
     }
 
     ctx->entropy_decode_mono(ctx, count);
-    if (ctx->error)
-        return;
 
     /* Now apply the predictor decoding */
     ctx->predictor_decode_mono(ctx, count);
@@ -1395,8 +1387,6 @@ static void ape_unpack_stereo(APEContext *ctx, int count)
     }
 
     ctx->entropy_decode_stereo(ctx, count);
-    if (ctx->error)
-        return;
 
     /* Now apply the predictor decoding */
     ctx->predictor_decode_stereo(ctx, count);
@@ -1507,20 +1497,17 @@ static int ape_decode_frame(AVCodecContext *avctx, void *data,
     /* reallocate decoded sample buffer if needed */
     decoded_buffer_size = 2LL * FFALIGN(blockstodecode, 8) * sizeof(*s->decoded_buffer);
     av_assert0(decoded_buffer_size <= INT_MAX);
-
-    /* get output buffer */
-    frame->nb_samples = blockstodecode;
-    if ((ret = ff_get_buffer(avctx, frame, 0)) < 0) {
-        s->samples=0;
-        return ret;
-    }
-
     av_fast_malloc(&s->decoded_buffer, &s->decoded_size, decoded_buffer_size);
     if (!s->decoded_buffer)
         return AVERROR(ENOMEM);
-    memset(s->decoded_buffer, 0, decoded_buffer_size);
+    memset(s->decoded_buffer, 0, s->decoded_size);
     s->decoded[0] = s->decoded_buffer;
     s->decoded[1] = s->decoded_buffer + FFALIGN(blockstodecode, 8);
+
+    /* get output buffer */
+    frame->nb_samples = blockstodecode;
+    if ((ret = ff_get_buffer(avctx, frame, 0)) < 0)
+        return ret;
 
     s->error=0;
 

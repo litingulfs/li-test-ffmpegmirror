@@ -25,7 +25,6 @@
 #include "libavutil/intreadwrite.h"
 #include "avc.h"
 #include "avio.h"
-#include "avio_internal.h"
 #include "hevc.h"
 
 #define MAX_SPATIAL_SEGMENTATION 4096 // max. value of u(12) field
@@ -1055,14 +1054,9 @@ int ff_hevc_annexb2mp4_buf(const uint8_t *buf_in, uint8_t **buf_out,
         return ret;
 
     ret   = ff_hevc_annexb2mp4(pb, buf_in, *size, filter_ps, ps_count);
-    if (ret < 0) {
-        ffio_free_dyn_buf(&pb);
-        return ret;
-    }
-
     *size = avio_close_dyn_buf(pb, buf_out);
 
-    return 0;
+    return ret;
 }
 
 int ff_isom_write_hvcc(AVIOContext *pb, const uint8_t *data,

@@ -19,7 +19,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "libavutil/avassert.h"
 #include "libavutil/mem.h"
 #include "libavcodec/av1.h"
 #include "libavcodec/av1_parse.h"
@@ -27,22 +26,14 @@
 #include "libavcodec/put_bits.h"
 #include "av1.h"
 #include "avio.h"
-#include "avio_internal.h"
 
-static int av1_filter_obus(AVIOContext *pb, const uint8_t *buf,
-                           int size, int *offset)
+int ff_av1_filter_obus(AVIOContext *pb, const uint8_t *buf, int size)
 {
-    const uint8_t *start = buf, *end = buf + size;
+    const uint8_t *end = buf + size;
     int64_t obu_size;
-    int off, start_pos, type, temporal_id, spatial_id;
-    enum {
-        START_NOT_FOUND,
-        START_FOUND,
-        END_FOUND,
-        OFFSET_IMPOSSIBLE,
-    } state = START_NOT_FOUND;
+    int start_pos, type, temporal_id, spatial_id;
 
-    off = size = 0;
+    size = 0;
     while (buf < end) {
         int len = parse_obu_header(buf, end - buf, &obu_size, &start_pos,
                                    &type, &temporal_id, &spatial_id);
@@ -54,62 +45,36 @@ static int av1_filter_obus(AVIOContext *pb, const uint8_t *buf,
         case AV1_OBU_REDUNDANT_FRAME_HEADER:
         case AV1_OBU_TILE_LIST:
         case AV1_OBU_PADDING:
-            if (state == START_FOUND)
-                state = END_FOUND;
             break;
         default:
-            if (state == START_NOT_FOUND) {
-                off   = buf - start;
-                state = START_FOUND;
-            } else if (state == END_FOUND) {
-                state = OFFSET_IMPOSSIBLE;
-            }
-            if (pb)
-                avio_write(pb, buf, len);
+            avio_write(pb, buf, len);
             size += len;
             break;
         }
         buf += len;
     }
 
-    if (offset)
-        *offset = state != OFFSET_IMPOSSIBLE ? off : -1;
-
     return size;
 }
 
-int ff_av1_filter_obus(AVIOContext *pb, const uint8_t *buf, int size)
+int ff_av1_filter_obus_buf(const uint8_t *buf, uint8_t **out, int *size)
 {
-    return av1_filter_obus(pb, buf, size, NULL);
-}
+    AVIOContext *pb;
+    int ret;
 
-int ff_av1_filter_obus_buf(const uint8_t *in, uint8_t **out,
-                           int *size, int *offset)
-{
-    AVIOContext pb;
-    uint8_t *buf;
-    int len, off, ret;
-
-    len = ret = av1_filter_obus(NULL, in, *size, &off);
-    if (ret < 0) {
+    ret = avio_open_dyn_buf(&pb);
+    if (ret < 0)
         return ret;
-    }
-    if (off >= 0) {
-        *out    = (uint8_t *)in;
-        *size   = len;
-        *offset = off;
 
-        return 0;
-    }
+    ret = ff_av1_filter_obus(pb, buf, *size);
+    if (ret < 0)
+        return ret;
 
-    buf = av_malloc(len + AV_INPUT_BUFFER_PADDING_SIZE);
-    if (!buf)
-        return AVERROR(ENOMEM);
+    av_freep(out);
+    *size = avio_close_dyn_buf(pb, out);
 
-    ffio_init_context(&pb, buf, len, 1, NULL, NULL, NULL, NULL);
-
-    ret = av1_filter_obus(&pb, in, *size, NULL);
-    av_assert1(ret == len);
+    return ret;
+}
 
 static inline void uvlc(GetBitContext *gb)
 {
@@ -289,7 +254,7 @@ static int parse_sequence_header(AV1SequenceParameters *seq_params, const uint8_
     if (!reduced_still_picture_header) {
         int enable_order_hint, seq_force_screen_content_tools;
 
-        skip_bits(&gb, 4); // enable_interintra_compound (1), enable_masked_compound (1)
+        skip_bits(&gb, 4); // enable_intraintra_compound (1), enable_masked_compound (1)
                            // enable_warped_motion (1), enable_dual_filter (1)
 
         enable_order_hint = get_bits1(&gb);
@@ -358,7 +323,7 @@ int ff_isom_write_av1c(AVIOContext *pb, const uint8_t *buf, int size)
     AV1SequenceParameters seq_params;
     PutBitContext pbc;
     uint8_t header[4];
-    uint8_t *seq, *meta;
+    uint8_t *seq = NULL, *meta = NULL;
     int64_t obu_size;
     int start_pos, type, temporal_id, spatial_id;
     int ret, nb_seq = 0, seq_size, meta_size;
@@ -408,7 +373,7 @@ int ff_isom_write_av1c(AVIOContext *pb, const uint8_t *buf, int size)
         buf  += len;
     }
 
-    seq_size  = avio_get_dyn_buf(seq_pb, &seq);
+    seq_size  = avio_close_dyn_buf(seq_pb, &seq);
     if (!seq_size) {
         ret = AVERROR_INVALIDDATA;
         goto fail;
@@ -433,13 +398,17 @@ int ff_isom_write_av1c(AVIOContext *pb, const uint8_t *buf, int size)
     avio_write(pb, header, sizeof(header));
     avio_write(pb, seq, seq_size);
 
-    meta_size = avio_get_dyn_buf(meta_pb, &meta);
+    meta_size = avio_close_dyn_buf(meta_pb, &meta);
     if (meta_size)
         avio_write(pb, meta, meta_size);
 
 fail:
-    ffio_free_dyn_buf(&seq_pb);
-    ffio_free_dyn_buf(&meta_pb);
+    if (!seq)
+        avio_close_dyn_buf(seq_pb, &seq);
+    if (!meta)
+        avio_close_dyn_buf(meta_pb, &meta);
+    av_free(seq);
+    av_free(meta);
 
     return ret;
 }

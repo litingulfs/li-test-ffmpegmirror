@@ -84,7 +84,7 @@ static inline int get_sample_rate(GetBitContext *gb, int *index)
 }
 
 int ff_mpeg4audio_get_config_gb(MPEG4AudioConfig *c, GetBitContext *gb,
-                                int sync_extension, void *logctx)
+                                int sync_extension)
 {
     int specific_config_bitindex, ret;
     int start_bit_index = get_bits_count(gb);
@@ -93,10 +93,6 @@ int ff_mpeg4audio_get_config_gb(MPEG4AudioConfig *c, GetBitContext *gb,
     c->chan_config = get_bits(gb, 4);
     if (c->chan_config < FF_ARRAY_ELEMS(ff_mpeg4audio_channels))
         c->channels = ff_mpeg4audio_channels[c->chan_config];
-    else {
-        av_log(logctx, AV_LOG_ERROR, "Invalid chan_config %d\n", c->chan_config);
-        return AVERROR_INVALIDDATA;
-    }
     c->sbr = -1;
     c->ps  = -1;
     if (c->object_type == AOT_SBR || (c->object_type == AOT_PS &&
@@ -118,8 +114,8 @@ int ff_mpeg4audio_get_config_gb(MPEG4AudioConfig *c, GetBitContext *gb,
 
     if (c->object_type == AOT_ALS) {
         skip_bits(gb, 5);
-        if (show_bits(gb, 24) != MKBETAG('\0','A','L','S'))
-            skip_bits(gb, 24);
+        if (show_bits_long(gb, 24) != MKBETAG('\0','A','L','S'))
+            skip_bits_long(gb, 24);
 
         specific_config_bitindex = get_bits_count(gb);
 
@@ -156,7 +152,6 @@ int ff_mpeg4audio_get_config_gb(MPEG4AudioConfig *c, GetBitContext *gb,
     return specific_config_bitindex - start_bit_index;
 }
 
-#if LIBAVCODEC_VERSION_MAJOR < 59
 int avpriv_mpeg4audio_get_config(MPEG4AudioConfig *c, const uint8_t *buf,
                                  int bit_size, int sync_extension)
 {
@@ -170,22 +165,5 @@ int avpriv_mpeg4audio_get_config(MPEG4AudioConfig *c, const uint8_t *buf,
     if (ret < 0)
         return ret;
 
-    return ff_mpeg4audio_get_config_gb(c, &gb, sync_extension, NULL);
-}
-#endif
-
-int avpriv_mpeg4audio_get_config2(MPEG4AudioConfig *c, const uint8_t *buf,
-                                  int size, int sync_extension, void *logctx)
-{
-    GetBitContext gb;
-    int ret;
-
-    if (size <= 0)
-        return AVERROR_INVALIDDATA;
-
-    ret = init_get_bits8(&gb, buf, size);
-    if (ret < 0)
-        return ret;
-
-    return ff_mpeg4audio_get_config_gb(c, &gb, sync_extension, logctx);
+    return ff_mpeg4audio_get_config_gb(c, &gb, sync_extension);
 }
