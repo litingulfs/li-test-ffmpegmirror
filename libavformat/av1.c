@@ -111,15 +111,6 @@ int ff_av1_filter_obus_buf(const uint8_t *in, uint8_t **out,
     ret = av1_filter_obus(&pb, in, *size, NULL);
     av_assert1(ret == len);
 
-    memset(buf + len, 0, AV_INPUT_BUFFER_PADDING_SIZE);
-
-    *out  = buf;
-    *size = len;
-    *offset = 0;
-
-    return 0;
-}
-
 static inline void uvlc(GetBitContext *gb)
 {
     int leading_zeros = 0;

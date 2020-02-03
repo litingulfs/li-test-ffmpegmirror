@@ -1063,14 +1063,14 @@ FF_ENABLE_DEPRECATION_WARNINGS
     av_dict_free(&tmp);
     av_freep(&avctx->priv_data);
     av_freep(&avctx->subtitle_header);
-    if (avci) {
-        av_frame_free(&avci->to_free);
-        av_frame_free(&avci->compat_decode_frame);
-        av_frame_free(&avci->buffer_frame);
-        av_packet_free(&avci->buffer_pkt);
-        av_packet_free(&avci->last_pkt_props);
+    if (avctx->internal) {
+        av_frame_free(&avctx->internal->to_free);
+        av_frame_free(&avctx->internal->compat_decode_frame);
+        av_frame_free(&avctx->internal->buffer_frame);
+        av_packet_free(&avctx->internal->buffer_pkt);
+        av_packet_free(&avctx->internal->last_pkt_props);
 
-        av_packet_free(&avci->ds.in_pkt);
+        av_packet_free(&avctx->internal->ds.in_pkt);
         ff_decode_bsfs_uninit(avctx);
 
         av_freep(&avci->pool);

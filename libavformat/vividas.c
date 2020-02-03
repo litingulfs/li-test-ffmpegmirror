@@ -284,7 +284,9 @@ static int track_header(VividasDemuxContext *viv, AVFormatContext *s,  uint8_t *
     int num_video;
     AVIOContext pb0, *pb = &pb0;
 
-    ffio_init_context(pb, buf, size, 0, NULL, NULL, NULL, NULL);
+    pb = avio_alloc_context(buf, size, 0, NULL, NULL, NULL, NULL);
+    if (!pb)
+        return AVERROR(ENOMEM);
 
     ffio_read_varlen(pb); // track_header_len
     avio_r8(pb); // '1'
@@ -385,15 +387,18 @@ static int track_header(VividasDemuxContext *viv, AVFormatContext *s,  uint8_t *
             for (j = 0; j < num_data; j++) {
                 uint64_t len = ffio_read_varlen(pb);
                 if (len > INT_MAX/2 - xd_size) {
+                    av_free(pb);
                     return AVERROR_INVALIDDATA;
                 }
                 data_len[j] = len;
                 xd_size += len;
             }
 
-            ret = ff_alloc_extradata(st->codecpar, 64 + xd_size + xd_size / 255);
-            if (ret < 0)
-                return ret;
+            st->codecpar->extradata_size = 64 + xd_size + xd_size / 255;
+            if (ff_alloc_extradata(st->codecpar, st->codecpar->extradata_size)) {
+                av_free(pb);
+                return AVERROR(ENOMEM);
+            }
 
             p = st->codecpar->extradata;
             p[0] = 2;
@@ -421,6 +426,7 @@ static int track_header(VividasDemuxContext *viv, AVFormatContext *s,  uint8_t *
         }
     }
 
+    av_free(pb);
     return 0;
 }
 
